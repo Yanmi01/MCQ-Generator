@@ -7,7 +7,11 @@ from src.mcq_generator.MCQGenerator import generate_and_evaluate_chain
 import streamlit as st
 
 
-with open("C:/Users/HP/personal_projects/AI_engineering/MCQ Generator/data/response.json", "r") as file:
+# with open("C:/Users/HP/personal_projects/AI_engineering/MCQ Generator/data/response.json", "r") as file:
+base_dir = os.path.dirname(__file__)
+file_path = os.path.join(base_dir, "data", "response.json")
+
+with open(file_path, "r") as file:
     RESPONSE_JSON = json.load(file)
 
 # st.title("MCQ Generator Application Using Langchain")
