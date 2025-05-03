@@ -31,58 +31,68 @@ with st.form("user_input"):
     # Add button
     button = st.form_submit_button("Create MCQs")   
 
-    # check if the button is clicked and all fields have input
-    if button and uploaded_file and mcq_count and subject and tone:
-        with st.spinner("Generating MCQs..."):
-            try:
-                # read the file
-                text = read_file(uploaded_file)
-                # check if the text is not empty
-                if text:
-                    # generate the quiz by invoking the chain
-                    result = generate_and_evaluate_chain.invoke({
-                        "text": text, 
-                        "number": mcq_count, 
-                        "subject": subject, 
-                        "tone": tone, 
-                        "response_json": json.dumps(RESPONSE_JSON)
-                    })
+if button and uploaded_file and mcq_count and subject and tone:
+    with st.spinner("Generating MCQs..."):
+        try:
+            text = read_file(uploaded_file)
+            if text:
+                result = generate_and_evaluate_chain.invoke({
+                    "text": text, 
+                    "number": mcq_count, 
+                    "subject": subject, 
+                    "tone": tone, 
+                    "response_json": json.dumps(RESPONSE_JSON)
+                })
+                
+                raw = result.content if hasattr(result, "content") else str(result)
+                
+                # Extract just the JSON portion from the output
+                try:
+                    # Find the start of the JSON (look for "{")
+                    json_start = raw.find('{')
+                    # Find the end of the JSON (look for the last "}")
+                    json_end = raw.rfind('}') + 1
+                    json_str = raw[json_start:json_end]
+                    quiz = json.loads(json_str)
+                except (ValueError, json.JSONDecodeError) as e:
+                    st.error(f"Could not extract JSON from response: {e}")
+                    st.text("Raw output for debugging:")
+                    st.text(raw)
+                    quiz = None
+                
+                if quiz:
+                    # Transform the nested JSON into a flat structure
+                    questions = []
+                    for q_num, q_data in quiz.items():
+                        if isinstance(q_data, dict):
+                            question = {
+                                "Question": q_data.get("mcq", ""),
+                                "Option A": q_data.get("options", {}).get("a", ""),
+                                "Option B": q_data.get("options", {}).get("b", ""),
+                                "Option C": q_data.get("options", {}).get("c", ""),
+                                "Option D": q_data.get("options", {}).get("d", ""),
+                                "Correct Answer": q_data.get("correct", "")
+                            }
+                            questions.append(question)
                     
-                    # Handle the result (depending on whether it’s a string or dict)
-                    raw = result.content if hasattr(result, "content") else str(result)
-                    try:
-                        quiz = json.loads(raw)  # attempt to parse as JSON
-                    except json.JSONDecodeError:
-                        quiz = raw  # if not JSON, treat as plain text
-
-            except Exception as e:
-                st.error(f"Error generating the quiz: {e}")
-                st.text(traceback.format_exc())  # Show the full traceback
-            else:
-                # Process quiz result
-                df = None  # Initialize df to None
-                if isinstance(quiz, dict):
-                    response = quiz.get("response", None)
-                    if response:
-                        questions = get_table_data(response)
-                        if questions:
-                            df = pd.DataFrame(questions)
-                            df.index = df.index + 1  # to start the index at 1
-                            # display the quiz table data in a table format
-                            st.table(df)
-    
-                            st.text_area(label="Review", value = quiz['review'], height=200)
-
-                        else:
-                            st.error("Error converting the quiz to a table format")
-                else:
-                    st.write(quiz)  # Display raw quiz output (text or JSON)
-                # Provide an option to download the quiz as a CSV file
-                # if df is not None:
-                #     csv = df.to_csv(index=False).encode('utf-8')
-                #     st.download_button(
-                #         label="Download Quiz as CSV",
-                #         data=csv,
-                #         file_name="quiz.csv",
-                #         mime="text/csv",
-                #     )
+                    if questions:
+                        df = pd.DataFrame(questions)
+                        df.index = df.index + 1
+                        
+                        # Display the quiz
+                        st.table(df)
+                        
+                        # Create download button
+                        csv = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download Quiz as CSV",
+                            data=csv,
+                            file_name=f"{subject}_quiz.csv",
+                            mime="text/csv",
+                        )
+                    else:
+                        st.error("No questions found in the quiz data")
+                
+        except Exception as e:
+            st.error(f"Error generating the quiz: {e}")
+            st.text(traceback.format_exc())
