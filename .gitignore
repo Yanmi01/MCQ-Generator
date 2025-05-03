@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+env/
+mcqgen/Include/
+mcqgen/Lib/
+mcqgen/Scripts/
+*.pyvenv.cfg
+
+# Logs and outputs
+*.log
+logs/
+
+# Environment variables
+.env
+
+experiment
